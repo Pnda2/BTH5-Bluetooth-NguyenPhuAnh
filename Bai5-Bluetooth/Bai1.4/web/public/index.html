@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Dashboard - DHT11 Monitor</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .cards { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; }
+        .card { padding: 20px; border: 1px solid #ddd; border-radius: 8px; min-width: 150px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { margin: 0; font-size: 2em; color: #333; }
+        span { font-size: 0.8em; color: #666; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Giám sát Nhiệt độ & Độ ẩm Real-time</h1>
+        
+        <div class="cards">
+            <div class="card">
+                <h3>Nhiệt độ</h3>
+                <h2 id="tempDisplay">--</h2> <span>°C</span>
+            </div>
+            <div class="card">
+                <h3>Độ ẩm</h3>
+                <h2 id="humDisplay">--</h2> <span>%</span>
+            </div>
+        </div>
+
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        const socket = io();
+        
+        // Cấu hình Chart.js
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const maxDataPoints = 20; // Chỉ hiển thị 20 điểm dữ liệu gần nhất
+        
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // Trục thời gian
+                datasets: [{
+                    label: 'Nhiệt độ (°C)',
+                    data: [],
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: 'Độ ẩm (%)',
+                    data: [],
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: false }
+                }
+            }
+        });
+
+        // Lắng nghe sự kiện từ Server
+        socket.on('sensor-data', (data) => {
+            console.log("Nhận data:", data);
+
+            // Cập nhật số liệu hiển thị
+            document.getElementById('tempDisplay').innerText = data.temp;
+            document.getElementById('humDisplay').innerText = data.hum;
+
+            // Cập nhật biểu đồ
+            const now = new Date().toLocaleTimeString();
+
+            // Thêm dữ liệu mới
+            myChart.data.labels.push(now);
+            myChart.data.datasets[0].data.push(data.temp);
+            myChart.data.datasets[1].data.push(data.hum);
+
+            // Giới hạn số lượng điểm trên biểu đồ (tránh lag)
+            if (myChart.data.labels.length > maxDataPoints) {
+                myChart.data.labels.shift(); // Xóa điểm cũ nhất
+                myChart.data.datasets[0].data.shift();
+                myChart.data.datasets[1].data.shift();
+            }
+
+            myChart.update(); // Vẽ lại
+        });
+    </script>
+</body>
+</html>
